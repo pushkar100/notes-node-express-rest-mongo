@@ -197,6 +197,8 @@ User.find({ name: 'joe' })
       })
 ```
 
+**Note:** **`<collection>.find({})`** will return *all the records* (documents) of a collection
+
 #### Matching the unique id
 
 Many records might share the same properties. But, an ID will always be unique!
@@ -263,15 +265,43 @@ There are 6 ways to do this:
 
 Methods on a model instance (i.e a record):
 
-1. `update()`: Updates the record
-2. `set()`: 
-3. `save()`
+1. `update()`: Updates the record. 
+	- `update` is **deprecated** now. Use **`updateOne`**
+2. `set()` &`save()`: We can set a record's property *in memory* & save it back to the database collection! A common pattern is to apply many `set` and in the end, perform one `save`
 
 Methods on the model class (i.e collection & its schema):
 
-1. s
-2. s
-3. d
+1. `update()`: Updates *all the matching records*. 
+	- `update` is **deprecated** now. Use **`updateOne`**, **`updateMany`**, or **`bulkWrite`** instead
+2. `findOneAndUpdate()`: Updates one matching record
+3. `findByIdAndUpdate()`: Updates one record if it matches the id passed to it
+
+The above methods take ***two arguments***: 
+- An object (or `_id` according to which method is being called) to match the record, and
+- Another object to update the matched record
+
+Example of `set()` & `save()`:
+
+```js
+joe.set('name', 'alex')
+joe.save()
+```
+
+Example of model instance `updateOne`:
+
+```js
+joe.updateOne({ name: 'alex' })
+```
+
+Example of model class update methods:
+
+```js
+User.updateOne({ name: 'joe' }, { name: 'alex' })
+// ...
+User.findOneAndUpdate({ name: 'joe' }, { name: 'alex' })
+// ...
+User.findByIdAndUpdate(joe._id, { name: 'alex' })
+```
 
 ### Note: Some of the above methods are deprecated!
 
@@ -387,7 +417,7 @@ describe('Reading users out of the database', () => {
 })
 ```
 
-### Examples of *Deleting* a record
+### Examples of a *Delete* records test
 
 ```js
 const assert = require('assert')
@@ -403,45 +433,87 @@ describe('Deleting a user', () => {
     joe.save().then(() => done())
   })
 
+  function assertUserDeleted(operation, done) {
+    operation.then(() => User.findOne({ name: 'joe' }))
+      .then(user => {
+        assert(user === null)
+        done()
+      })
+  }
+
   // 2. Run the operation to delete a record or records & assert it:
   it('model instance remove', done => {
     // 3. Remove the record & wait for it to complete.
     // 4. Then search in collection for removed record: Must not find it!
-    joe.remove({ name: 'joe' })
-      .then(() => User.findOne({ name: 'joe' }))
-      .then(user => {
-        assert(user === null)
-        done()
-      })
+    assertUserDeleted(joe.remove({ name: 'joe' }), done)   
   })
 
   it('class method remove', done => {
     // 5. Use model class to remove many matches:
-    User.deleteMany() // `<model>.remove()` is deprecated!
-      .then(() => User.findOne({ name: 'joe' }))
-      .then(user => {
-        assert(user === null)
-        done()
-      })
+    assertUserDeleted(User.deleteMany(), done) 
+    // Using `deleteMany` because `<model>.remove()` is deprecated!
   })
 
   it('class method findAndRemove', done => {
-    User.findOneAndRemove({ name: 'joe' })
-      .then(() => User.findOne({ name: 'joe' }))
-      .then(user => {
-        assert(user === null)
-        done()
-      })
+    assertUserDeleted(User.findOneAndRemove({ name: 'joe' }), done)
   })
 
   it('class method findByIdAndRemove', done => {
-    User.findByIdAndRemove(joe._id)
-      .then(() => User.findOne({ name: 'joe' }))
-      .then(user => {
-        assert(user === null)
-        done()
-      })
+    assertUserDeleted(User.findByIdAndRemove(joe._id), done)
   })
 })
 ```
 
+### Examples of *Updating* records test
+
+```js
+const assert = require('assert')
+const User = require('../src/user')
+
+describe('Updating users', () => {
+  // 0. Save reference to a record you create
+  let joe
+
+  // 1. Create a record before running tests to update it:
+  beforeEach(done => {
+    joe = new User({ name: 'joe' })
+    joe.save().then(() => done())
+  })
+
+  function assertName(operation, done) {
+    operation
+      .then(() => User.find({})) // Empty object fetches all records (documents) 
+      .then(users => {
+        assert(users.length === 1)
+        assert(users[0].name === 'alex')
+        done()
+      })
+  }
+
+  // 2. Run the tests to update the record(s)
+  it('Model instance set & save', done => {
+    joe.set('name', 'alex')
+    // 3. Find all the users after setting & saving
+    // 4. Make sure when you update the collection of one user
+    // the count is still 1 record & the value of that record 
+    // matches the update:
+    assertName(joe.save(), done)
+  })
+
+  it('Model instance update', done => {
+    assertName(joe.updateOne({ name: 'alex' }), done)
+  })
+
+  it('Model class can update many', done => {
+    assertName(User.updateOne({ name: 'joe' }, { name: 'alex' }), done)
+  })
+
+  it('Model class can find one & update', done => {
+    assertName(User.findOneAndUpdate({ name: 'joe' }, { name: 'alex' }), done)
+  })
+
+  it('Model class can find one by id & update', done => {
+    assertName(User.findByIdAndUpdate(joe._id, { name: 'alex' }), done)
+  })
+})
+```
