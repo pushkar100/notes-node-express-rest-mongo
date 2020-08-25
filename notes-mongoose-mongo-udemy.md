@@ -308,7 +308,7 @@ User.findByIdAndUpdate(joe._id, { name: 'alex' })
 [Link to replacements](https://mongoosejs.com/docs/deprecations.html)
 
 1. `<model>.remove()` is deprecated. Use **`deleteOne()`** or **`deleteMany()`**
-2. `<model>.update()` is deprecated. Use **`updateOne()`**, **updateMany()**, or **replaceOne()**
+2. `<model>.update()` is deprecated. Use **`updateOne()`**, **`updateMany()`**, or **`replaceOne()`**
 3. `count()`  is deprecated. Use **`countDocuments()`** instead
 
 ## Testing Mongoose & Mongo
@@ -517,3 +517,141 @@ describe('Updating users', () => {
   })
 })
 ```
+
+## Update operators
+
+The brute force approach to update records from a collection is to (a) fetch the records (b) update it & (c) save it. However, fetching data to the server to update it is expensive i.e it involves a round trip. What if we can just convey to the database to find & update it in custom ways i.e give it directions? In this way, we don't have to fetch any data. Mongo [update operators](https://docs.mongodb.com/manual/reference/operator/update/) help us do this
+
+Some of the common operators are:
+
+- `$inc`: Increment the value by an amount
+- `$mul`: multiplies the value by an amount
+- `$set`: Sets a field
+- `$unset`: Removes a field
+- `$rename`: Renames a property
+
+Example of how to use an update operator:
+
+```js
+// Increment using $inc:
+User.updateOne({ name: 'joe' }, {
+	$inc: {
+		postCount: 1 // Increments postCount of a record with name 'joe' by 1
+	}
+})
+
+// Decrement using $inc but a negative number:
+User.updateOne({ name: 'joe' }, {
+	$inc: {
+		postCount: -2 // Decrements postCount of a record with name 'joe' by 2
+	}
+})
+```
+
+## Validating records
+
+### What is validation?
+
+It is a process of checking whether the values are safe to add into our database. *Validating a record during its creation*
+
+### Adding validation to the schema
+
+We can add objects to schema properties instead of a simple type. This object can contain the type and other validation fields (Ex: `type` & `required`)
+
+The **`required`** field inside a schema takes in a 2-element array. First value being a boolean and the second is an error message to be displayed when validation fails
+
+Example of a schema with validation:
+
+```js
+const UserSchema = new Schema({
+  name: {
+    type: String,
+    required: [true, 'Name is required.']
+  },
+  postCount: Number
+})
+```
+
+### Checking if the value is valid
+
+Once you have added validation and want to test if the record creation was validated (created or reject) or not, you can user `<record>.validate()` or `<record>.validateSync(result => { ... })`
+
+The result that comes back is an object with a lot of data. It contains an `errors` property where we can find the `message` against the property that failed the validation
+
+Example:
+
+```js
+const user = new User({ name: undefined })
+const validationResult = user.validateSync()
+const { message } = validationResult.errors.name
+```
+
+### Testing validation inside a test suite
+
+Example:
+
+```js
+it('requires a username', () => {
+  const user = new User({ name: undefined })
+  const validationResult = user.validateSync()
+  const { message } = validationResult.errors.name
+
+  assert(message === 'Name is required.')
+})
+```
+
+### Adding a custom validator function
+
+`required` is good for mandatory properties but if we needed more complex validations, we need to add our custom checks. For this, mongoose allows us to have a validator function inside the schema.
+
+Inside our schema we can have a **`validate`** property for a schema field. This property is an object with the following properties:
+
+1. `validator()`: A method that takes in the value of the field and returns a boolean. If `true`, the check has passed else it has failed
+2. `message`: The message to display when the validation fails
+
+Example of a schema with validator function:
+
+```js
+const UserSchema = new Schema({
+  name: {
+    type: String,
+    required: [true, 'Name is required.'],
+    validate: {
+      validator: name => name.length > 2,
+      message: 'Name must be greater than 2 characters.'
+    }
+  },
+  postCount: Number
+})
+```
+
+Example of testing a schema's validator function:
+
+```js
+it('requires a user name with more than 2 characters', () => {
+  const user = new User({ name: 'Al' })
+  const validationResult = user.validateSync()
+  const { message } = validationResult.errors.name
+
+  assert(message === 'Name must be greater than 2 characters.')
+})
+```
+
+### Handling failure in saving of invalid records to database
+
+When you create a record and run `<record>.save()`, it will return a promise that rejects. The `catch()` clause will receive the validation result
+
+Example of testing failed record from being saved into the database:
+
+```js
+it('disallows invalid records from being saved', done => {
+    const user = new User({ name: 'Al' })
+    user.save()
+      .catch(validationResult => {
+        const { message } = validationResult.errors.name
+        assert(message === 'Name must be greater than 2 characters.')
+        done()
+      })
+  })
+```
+
