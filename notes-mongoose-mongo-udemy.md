@@ -126,6 +126,7 @@ Note that the collection we create using `.model` is conventionally singular in 
 
 1. The model for a collection is singular and capital like a class name (Ex: **'user'** as argument to the `model()` method and then assign the expression to the **User** variable by convention)
 2. While accessing collections, we will use the plural form though! Ex: `mongoose.connection.collections.users`
+3. ***By default, a schema does not validate additional properties***. That is, you may add properties to a record that is not defined in the model schema and it will not throw an error (data is saved!). Errors only on conflicts with a schema
 
 ### Accessing a collection
 
@@ -417,7 +418,7 @@ describe('Reading users out of the database', () => {
 })
 ```
 
-### Examples of a *Delete* records test
+### Examples of a ***Delete*** records test
 
 ```js
 const assert = require('assert')
@@ -464,7 +465,7 @@ describe('Deleting a user', () => {
 })
 ```
 
-### Examples of *Updating* records test
+### Examples of ***Updating*** records test
 
 ```js
 const assert = require('assert')
@@ -653,5 +654,215 @@ it('disallows invalid records from being saved', done => {
         done()
       })
   })
+```
+
+## Handling Relational Data
+
+In SQL databases such as MySQL or PostgreSQL, the relations are constructed between tables i.e using a foreign key to match a primary key of another table. For example, a `user` table can have a `post` table related to it by storing a list of `post_id` with it. In this way, many posts can be related to one user
+
+In a non-relational database like mongo, the philosophy is different. We do not want to have to many relations - this might even make scaling hard and is less flexible (but more strict). Therefore, *in mongo, we do not go and create multiple collections and relate them to each other*. Instead, we *maintain one collection* and within that we can have schemas for sub-items (like a user collection with an array of posts). The basic approach is to *embed one type of collection in another* if that is easier to do that relating two different collections
+
+### Difference between a model and a schema
+
+- A schema is used to define the type of data. It need not be limited to a collection
+- A model is used to describe, as a blueprint, the type of data that a collection can contain. Every document in a collection is an instance of the model
+- A model can use a schema. However, a schema can be used for other things as well - including sub-objects of a document inside a collection
+
+Example: `users` collection can have a property (array) called `posts`. Both of these can have a schema (but only a user model and no post model)
+
+Inside a model schema, we can embed another schema like data type (Ex: instead of `String`, use `PostSchema`)
+
+Example:
+
+```js
+// Create a schema for a post:
+const PostSchema = new Schema({
+  title: String
+})
+
+// User is a model with a schema
+// It uses the PostSchema for 'posts'
+const UserSchema = new Schema({
+  name: String,
+  postCount: Number,
+  posts: [PostSchema]
+})
+const User = mongoose.model('user', UserSchema)
+```
+
+### Populating a sub-document with schema during record creation
+
+It is no different from populating a normal property of a model. It's just that the values must match the schema, otherwise the operation will fail
+
+Example of testing creation of a record (user) with a sub-document schema (posts):
+
+```js
+const assert = require('assert')
+const User = require('../src/user')
+const { Schema } = require('mongoose')
+
+describe('Subdocument tests', () => {
+  it('Can create a sub-document', done => {
+    // 1. Create new user with a subdocument that
+    // matches the subdocument schema:
+    const joe = new User({
+      name: 'joe',
+      posts: [{ title: 'A post title' }] // Make sure sub-dcoument follows schema
+    })
+
+    // 2. Save record
+    joe.save()
+      .then(() => User.findOne({ name: 'joe' }))
+      .then(user => {
+        // 3. Make sure to test subdocument by testing 
+        // the value for it that was saved!
+        assert(user.posts[0].title === 'A post title')
+        done()
+      })
+  })
+})
+```
+
+### Adding a sub-document with schema to an existing record
+
+The way to save a sub-document to an existing record is to:
+
+1. Fetch the record model, 
+2. Make the changes to the sub-document of the record, and 
+3. Saving the record back
+
+Example of testing the addition of a sub-document to an existing record:
+
+```js
+it('Can add a sub-document to existing record', done => {
+  // 0. First create a record & save it:
+  const joe = new User({
+    name: 'joe',
+    posts: []
+  }) 
+
+  joe.save()
+    // 1. Fetch an existing record:
+    .then(() => User.findOne({ name: 'joe' }))
+    // 2. Update the sub-document & save it back:
+    .then(user => {
+      user.posts.push({ title: 'A new post'})
+      return user.save()
+    })
+    // 3. Fetch the record again & assert the addition of a sub-document:
+    .then(() => User.findOne({ name: 'joe' }))
+    .then(user => {
+      assert(user.posts[0].title === 'A new post')
+      done()
+    })
+})
+```
+
+### Removing an existing sub-document
+
+We can remove an existing sub-document using regular javascript techniques and re-save the record. For example, we can remove a post from a list of posts (sub-document) by doing a `splice`. This might soon become tedious
+
+Mongoose gives us a little bit of a **magic**. It provides us with a **remove()** method on a sub-document (similar to how you'd remove a record itself). We can invoke this method on a sub-document and re-save the record. *No complex logic is required!*
+
+Example of testing the removal of a sub-document:
+
+```js
+it('Can remove an existing sub-document', done => {
+  // 0. First create a record & save it:
+  const joe = new User({
+    name: 'joe',
+    posts: [{ title: 'New post'}]
+  }) 
+
+  joe.save()
+    // 1. Fetch an existing record:
+    .then(() => User.findOne({ name: 'joe' }))
+    .then(user => {
+      // 2. Fetch a sub-document:
+      const post = user.posts[0]
+      // 3. Remove it with `remove()`:
+      post.remove()
+      // 4. Resave the document (record):
+      // DON'T make the mistake of saving the sub-document instead of the record!
+      return user.save()
+    })
+    // 5. Fetch it again and assert that the sub-document was removed:
+    .then(() => User.findOne({ name: 'joe' }))
+    .then(user => {
+      assert(user.posts.length === 0)
+      done()
+    })
+})
+```
+
+## Virtual types
+
+We can have two or more related properties inside a schema. This gives rise to a couple of problems:
+
+1. There is no single source of truth
+2. Updating one requires updating the other
+
+As an example, if we have a `User` model that contains both `posts` and `postCount` then it has the same set of problems listed above
+
+In order to have *single source of truth*, we can have computed/derived properties in the schema known as **virtual types**. In the `user` schema example, `posts` can be an actual property while the `postCount` can be a virtual type
+
+We define virtual types as a *property of the created schema* itself (and not part of the object passed into the Schema constructor). The syntax is:
+
+```js
+<schema>.virtual('<prop-name>').get(function() { 
+	// Use `this` to access a model instance i.e a document
+	// Whatever you return is the value of the virtual type
+})
+```
+
+**Note:** 
+
+Mongoose uses ES6 getters and setters internally when we apply the `get()` method. The function callback *cannot be an arrow function* since we need to use the context (i.e `this`) which will refer to the model's instance
+
+Example of a virtual type declaration in a schema:
+
+```js
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+const PostSchema = require('./post')
+
+const UserSchema = new Schema({
+  name: String,
+  posts: [PostSchema],
+})
+
+// THE VIRTUAL TYPE:
+UserSchema.virtual('postCount').get(function() {
+  return this.posts.length
+})
+
+const User = mongoose.model('user', UserSchema)
+```
+
+Example of testing out a virtual type:
+
+```js
+const assert = require('assert')
+const User = require('../src/user')
+
+describe('Virtual types', () => {
+  it('postCount returns a number of posts', done => {
+    // 1. Create record (without defining the virtual type):
+    const joe = new User({
+      name: 'joe',
+      posts: [{ title: 'A post' }]
+    }) 
+
+    // 2. We can test the count in memory itself
+    // but as a good practice we will save & test:
+    joe.save()
+      .then(() => User.findOne({ name: 'joe' }))
+      .then(user => {
+        // 3. Assert that the virtual type has the correct value:
+        assert(user.postCount === 1)
+        done()
+      })
+  })
+})
 ```
 
