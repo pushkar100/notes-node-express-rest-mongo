@@ -229,6 +229,22 @@ User.findOne({ _id: joe._id })
 
 We cannot match `_id`s directly since they are not plain strings or numbers but are objects in the internal representation. We must first convert `<record>._id` to a string using `<record>._id.toString()` and then read and compare the values
 
+#### A note on number of documents
+
+If you only want the count of records, we can go with `<Model>.count()` which also returns us a promise
+
+Example:
+
+```js
+User.count().then(count => console.log(count))
+// It hits the databse but just gets the number of records 
+// for a collection
+```
+
+**Note**
+
+`collection.count` is deprecated, and will be removed in a future version. Use **`Collection.countDocuments`** or **`Collection.estimatedDocumentCount`** instead
+
 ### Deleting records
 
 In mongo, delete is referred to as **remove**. There are 4 ways to do this:
@@ -1055,7 +1071,9 @@ describe('Associations', () => {
 
 ### Loading deeply nested associations
 
-We can use the **`populate()`** query modifier. Apart from just a property name, we can pass it an ***object***
+Some associations can be deeply nested or even *cyclic!*
+
+We can use the **`populate()`** query modifier to fetch them recursively. Apart from just a property name, we can pass it an ***object***
 
 The object contains:
 
@@ -1097,3 +1115,135 @@ it('saves a full relation graph', done => {
 
 Do not use the recursive populates too often and for deep nesting. This might have a performance drawback! Should benchmark it!
 
+## Mongoose middleware
+
+Imagine a scenario where a user owns many posts which in turn have many comments and those comments have an author as one of the users. There is a certain structure to the collections. A post or a comment cannot exist without a user.
+
+Mongoose gives us **middleware** to perform *housekeeping / clean up* actions when events occur. An example of it can be to delete all posts of a user when user record gets deleted
+
+The middlewares are defined on the model schema. We have a **`pre`** and a **`post`** middleware. They are known as **hooks**. There are 4 events we can attach middleware to:
+
+1. `init`: When the model is instantiated
+2. `validate`: When record is validated
+3. `save`: When a record is saved
+4. `remove`: When a record is removed
+
+The usage is as follows:
+
+```js
+const UserSchema = new Schema({
+  // ...
+  blogPosts: {
+    type: Schema.Types.ObjectId,
+    ref: 'blogpost'
+  },
+  // ...
+})
+
+// 1. Before removing a user record:
+UserSchema.pre('remove', function(next) { // Use next in middleware
+  // 2. Fetch the related collection model:
+  const BlogPost = mongoose.model('blogpost')
+  // 3. Use the remove (deleteMany) method on it:
+  // 4. Use the `$in` operator to select records where the id 
+  // is contained in the current schema's property:
+  BlogPost.deleteMany({
+    _id: {
+      $in: this.blogPosts
+    }
+  }).then(() => next()) // Once successful, call the next middleware
+})
+```
+
+Every middleware callback receives the **next** function. We invoke it once we are done with our processing inside it. It will call the next middleware or the action itself
+
+Inside the middleware callback, we can reference other models. Note that reference it outside (at the beginning of the module) might lead to cyclic dependencies in the model schema creation leading to errors. However, ***including it inside the callback ensures that the model is accessed only after the schemas have been safely created***
+
+In order to access another model collection inside the function and remove the corresponding records, we can use the **`$in`** operator. It basically searches for a key inside a list of items. In the above example, the ref will save the `_id` of blog posts. So, in the BlogPost collection model, we want to search for all blog posts that that ids that are included in the user model property `blogPosts` (which is a ref). In this way, it can search and remove them (instead of the tedious and complex regular javascript techniques)
+
+Example of testing a middleware hook:
+
+```js
+const mongoose = require('mongoose')
+const assert = require('assert')
+const User = require('../src/user')
+const BlogPost = require('../src/blogPost')
+
+describe('Middleware', () => {
+  let joe, blogPost
+
+  beforeEach(done => {
+    // 1. Setup records in collections:
+    joe = new User({ name: 'joe' })
+    blogPost = new BlogPost({ title: 'blog', content: 'post' })
+
+    // 2. Populate related data just like normal js operations:
+    joe.blogPosts.push(blogPost)
+
+    // 3. Save records into respective collections:
+    Promise.all([joe.save(), blogPost.save()])
+      .then(() => done())
+  })
+
+  it('Users clean up dangling blog post on remove', done => {
+    // 4. Remove a user
+    joe.remove()
+	  // 5. Count the records after removal
+      .then(() => BlogPost.countDocuments())
+      .then(count => {
+        assert(count === 0)
+        done()
+      })
+  })
+})
+```
+
+## Paginating data
+
+Many times the data set is huge. Fetching all of them at once and displaying them might not really be wise since it takes a lot of time & is a performance bottleneck
+
+It makes sense to query data in chunks i.e always getting a small window of the data instead of the whole list. This is a common technique used in all database querying
+
+In mongo & mongoose, we can use `skip` & `limit` which act like an offset from which to start querying from and the length of records from the offset to query
+
+`skip` & `limit` are **query modifiers** just like `populate`
+
+We can also **`sort`** our collection records. The argument is an object with a key as the sorting criteria. A value of `1` means ascending order sort and `-1` will be a descending order
+
+Explained with a test example:
+
+```js
+const assert = require('assert')
+const User = require('../src/user')
+
+describe('Reading users out of the database', () => {
+  // 0. Save reference to a record you create
+  let joe, maria, alex, zack
+
+  // 1. Create a record before running tests to find it:
+  beforeEach(done => {
+    joe = new User({ name: 'joe' })
+    alex = new User({ name: 'alex' })
+    maria = new User({ name: 'maria' })
+    zack = new User({ name: 'zack' })
+
+    Promise.all([alex.save(), joe.save(), maria.save(), zack.save()])
+      .then(() => done())
+  })
+  
+  it('can skip & limit test results', done => {
+    User.find({}) // fetches all user
+      // Skip the 1st user, and limit to 2 users
+      .skip(1)
+      .limit(2)
+      // Sort so that we can reliably predict the result order
+      .sort({ name: 1 }) // ascending order
+      .then(users => {
+        assert(users.length === 2)
+        assert(users[0].name === 'joe')
+        assert(users[1].name === 'maria')
+        done()
+      })
+  })
+})
+```
