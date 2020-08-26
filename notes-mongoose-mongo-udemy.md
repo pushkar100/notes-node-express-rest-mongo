@@ -127,6 +127,13 @@ Note that the collection we create using `.model` is conventionally singular in 
 1. The model for a collection is singular and capital like a class name (Ex: **'user'** as argument to the `model()` method and then assign the expression to the **User** variable by convention)
 2. While accessing collections, we will use the plural form though! Ex: `mongoose.connection.collections.users`
 3. ***By default, a schema does not validate additional properties***. That is, you may add properties to a record that is not defined in the model schema and it will not throw an error (data is saved!). Errors only on conflicts with a schema
+4. The collection created from a model is ***plural*** and ***all lowercase***! Ex: 
+
+```js
+mongoose.model('user', UserSchema)
+// The above will create a collection that can be accessed by: 
+mongoose.connection.collections.users
+```
 
 ### Accessing a collection
 
@@ -356,6 +363,24 @@ We can use `beforeEach` or similar methods to automate the dropping of the datab
 beforeEach(done => {
   mongoose.connection.collections.users.drop(() => {
     done()
+  })
+})
+```
+
+**Note:**
+
+- If you have multiple collections and want to test them together in some suite, it is better to *drop them all* (in a nested callback fashion) in the above `beforeEach` function
+- We cannot drop all collections at once, so we will have to follow a nested structure like the following:
+
+```js
+beforeEach(done => {
+  const { users, blogposts, comments } = mongoose.connection.collections
+  users.drop(() => {
+    comments.drop(() => {
+      blogposts.drop(() => {
+        done()
+      })
+    })
   })
 })
 ```
@@ -865,4 +890,210 @@ describe('Virtual types', () => {
   })
 })
 ```
+
+## Designing a schema
+
+Schema design is very important! Why? Because it determines the *ease with which you can query the data* and the *performance hit* 
+
+### Sub-documents (nested) versus separate collections
+
+Sub-documents make it easy to link one type of object to another. For example, 1 user can contain 1 or more posts. However, ***if the scenario demands deeper, more complex querying then nested documents have limitations!***
+
+Deeper querying example can be the following: A list page that displays posts. If the posts are saved inside the users collections (tied to each user) then we have to first get all the users, fetch posts of each user, and list them out.
+
+On top of that, we might need to limit the users we query for performance reasons. But, even if we do that there is a possibility that the set of users we got back might not have any posts. So, you will have to query once again.
+
+**The solution:** Separate collections that have pointers to each other (i.e relations)
+
+### Separate collections
+
+We can have separate collections with relations between them (similar to RDBMS: SQL tools). This helps with better structuring and querying of data
+
+As an example, if we have users, posts, and comments on the website, we can have 3 separate collections for each. Users can have a list of post IDs. Each post can contain a list of comment IDs. Finally, each comment can have a user ID
+
+#### RDBMS vs NoSQL 
+
+The difference between relational databases and NoSQL ones like Mongo is that when it comes to relations, SQL is better.
+
+- SQL has table ***joins***. NoSQL does not
+- Because of joins, we can query multiple tables in one instruction (Real time)
+- In NoSQL, we cannot query multiple collections at the same time with one instruction. There is always an overhead where we need to get one set of collection data to query the next collection
+
+### Creating separate collections with relations
+
+For any schema property that relates to another collection, we can link each other by the *object id* (`_id`) that mongo provides
+
+The linking property should be an object with a **`type: Schema.Types.ObjectId`** key & value. Also, it needs to have a **`ref`** that points to the collection model (model class) name
+
+Example:
+
+```js
+// blogPost model:
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const BlogPostSchema = new Schema({
+  title: String,
+  content: String,
+  comments: [{
+    type: Schema.Types.ObjectId,
+    ref: 'comment'
+  }]
+})
+
+const BlogPost = mongoose.model('blogpost', BlogPostSchema)
+module.exports = BlogPost
+```
+
+```js
+// comment model:
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const CommentSchema = new Schema({
+  content: String,
+  user: {
+    type: Schema.Types.ObjectId,
+    ref: 'user'
+  }
+})
+
+const Comment = mongoose.model('comment', CommentSchema)
+module.exports = Comment
+```
+
+```js
+// user model:
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const UserSchema = new Schema({
+  // ...
+  blogPosts: [{
+    type: Schema.Types.ObjectId,
+    ref: 'blogpost'
+  }],
+  // ...
+})
+
+const User = mongoose.model('user', UserSchema)
+module.exports = User
+```
+
+### Testing relations (associations)
+
+Associations can be made between instances by simply adding them like you'd add JS objects and values. Mongoose internally will identify that the property needs a relation and converts the passed values into reference IDs
+
+*We pass to a collection model instance the instance of another collection model and what gets saved is the object id (`_id`) of the instance*
+
+#### Modifiers for a query
+
+Modifiers help ***customize*** a query. This can be helpful when you need more than just a simple, expected output
+
+Syntax for a query modifier: 
+
+```js
+<Model>.<Query>.<Modifier>.then() // or catch clauses
+
+// Example:
+User.findOne({ name: 'joe' }).populate('blogPost').then()
+```
+
+#### Populate
+
+**`populate(<property>)`** is a common modifier when you wish to take a reference of a document in another collection (i.e `_id`) and *replace* it with the actual document
+
+This helps us modify our query - we don't have to query one collection and then another using the `_id` attribute (Ex: `findById`)
+
+**Note:**
+
+- Populate only populates up to *one level*. It does *not* populate from all collections recursively (no!). The reason for this is ***performance*** - it can take a lot of time and our database can even crash. To populate deeply nested data there can be other techniques used (discussed in the next section)
+
+Example of testing relations:
+
+```js
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+const assert = require('assert')
+
+const User = require('../src/user')
+const BlogPost = require('../src/blogPost')
+const Comment = require('../src/comment')
+
+describe('Associations', () => {
+  let joe, blogPost, comment
+
+  beforeEach(done => {
+    // 1. Setup records in collections:
+    joe = new User({ name: 'joe' })
+    blogPost = new BlogPost({ title: 'blog', content: 'post' })
+    comment = new Comment({ content: 'comment' })
+
+    // 2. Populate related data just like normal js operations:
+    joe.blogPosts.push(blogPost)
+    blogPost.comments.push(comment)
+    comment.user = joe
+    // Mongoose does the MAGIC of converting them to references!
+    // i.e Map the IDs
+
+    // 3. Save records into respective collections:
+    Promise.all([joe.save(), blogPost.save(), comment.save()])
+      .then(() => done())
+  })
+
+  it('saves a relation between a user & a blog post', done => {
+    User.findOne({ name: 'joe' })
+      // 4. Run the query modifier on the fetched data:
+      .populate('blogPosts')
+      .then(user => {
+        assert(user.blogPosts[0].title === 'blog')
+        done()
+      })
+  })
+})
+```
+
+### Loading deeply nested associations
+
+We can use the **`populate()`** query modifier. Apart from just a property name, we can pass it an ***object***
+
+The object contains:
+
+1. `path`: The property on the collection
+2. `model`: Tells which model to find inside the property and replace with data
+3. `populate`: To be able to recursively form further associations
+
+Note that `populate()` modifier does not need a `model` property but all nested `populate` properties need it
+
+An example of testing deeply nested associations:
+
+```js
+it('saves a full relation graph', done => {
+  User.findOne({ name: 'joe' })
+    .populate({
+      path: 'blogPosts',
+      populate: {
+        path: 'comments',
+        model: 'comment',
+        populate: {
+          path: 'user',
+          model: 'user'
+        }
+      }
+    })
+    .then(user => {
+      const { name, blogPosts } = user
+      const { title, comments } = blogPosts[0]
+      const { content, user: commentUser } = comments[0]
+      assert(name === 'joe')
+      assert(title === 'blog')
+      assert(content === 'comment')
+      assert(commentUser.name === 'joe')
+
+      done()
+    })
+})
+```
+
+Do not use the recursive populates too often and for deep nesting. This might have a performance drawback! Should benchmark it!
 
