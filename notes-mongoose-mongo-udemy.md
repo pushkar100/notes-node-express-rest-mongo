@@ -64,7 +64,7 @@ Installation:
     + [Loading deeply nested associations](#loading-deeply-nested-associations)
   * [Mongoose middleware](#mongoose-middleware)
   * [Paginating data](#paginating-data)
-  * [Min & max using `sort` & `limit`](#min---max-using--sort-----limit-)
+  * [Finding min & max](#finding-min---max)
   * [Getting results within a range](#getting-results-within-a-range)
   * [Querying substrings (searching without exact match)](#querying-substrings--searching-without-exact-match-)
 
@@ -1317,7 +1317,7 @@ describe('Reading users out of the database', () => {
 })
 ```
 
-## Min & max using `sort` & `limit`
+## Finding min & max
 
 1. Find minimum
 
