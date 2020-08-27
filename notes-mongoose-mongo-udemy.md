@@ -64,6 +64,9 @@ Installation:
     + [Loading deeply nested associations](#loading-deeply-nested-associations)
   * [Mongoose middleware](#mongoose-middleware)
   * [Paginating data](#paginating-data)
+  * [Min & max using `sort` & `limit`](#min---max-using--sort-----limit-)
+  * [Getting results within a range](#getting-results-within-a-range)
+  * [Querying substrings (searching without exact match)](#querying-substrings--searching-without-exact-match-)
 
 ## What is Mongo?
 
@@ -270,6 +273,8 @@ Many records might share the same properties. But, an ID will always be unique!
 
 Therefore, we can compare two IDs by matching the **`_id`** property of the record. We can do it with `find()` & `findOne()` promises as well
 
+A specific function called **`findById`** that takes in an ID also exists.
+
 Example:
 
 ```js
@@ -280,6 +285,13 @@ User.findOne({ _id: joe._id })
 // NOTE: that we cannot pass a string to match `_id`. Since `joe` was a
 // stored record, `joe._id` basically matched an object for `_id` 
 // and that is what it requires to be matched in find() & findOne() using `_id`
+```
+
+An example of **`findById()`**:
+
+```js
+User.findById(someId)
+	.then(user => {})
 ```
 
 #### A note on **`_id`**
@@ -1304,3 +1316,73 @@ describe('Reading users out of the database', () => {
   })
 })
 ```
+
+## Min & max using `sort` & `limit`
+
+1. Find minimum
+
+```js
+Artist.find({})
+    .sort({ yearsActive: 1 }) // Ascending order
+    .limit(1)
+    // .then(artists => artists[0].yearsActive); // to get min value
+```
+
+2. Find maximum
+
+```js
+Artist.find({})
+    .sort({ yearsActive: -1 }) // Descending order 
+    .limit(1)
+    // .then(artists => artists[0].yearsActive); // to get max value
+```
+
+## Getting results within a range
+
+1. Getting results above a minimum: **Use `$gt` or `$gte` operator**
+
+Example:
+
+```js
+// Find all artists greater than or equal to 20 years
+Artist.find({ age: { $gte: 20 } })
+```
+
+2. Getting results below a maximum: **Use `$lt` or `$lte` operator**
+
+Example:
+
+```js
+// Find all artists less than or equal to 50 years
+Artist.find({ age: { $lte: 50 } })
+```
+
+3. Getting results between a min & a max: **Combine 1 & 2**
+
+Example:
+
+```js
+// Find all artists between 20 & 50 years:
+Artist.find({ age: {  $gte: 20, $lte: 50 } })
+```
+
+**Note:** Use **`$eq`** & **`ne`** for equal to and not equal to operators, respectively
+
+## Querying substrings (searching without exact match)
+
+Imagine you have a list of names to filter out. If you start typing a name and we use the name as the `find` criteria, we will only get exact matches and not partial matches i.e If you search `don` you will not get 'donald' or 'donnie' since they are not exact matches. Therefore, for searching we should not go for exact matches
+
+In Mongo, we can perform a "text search" using the `$text` and `$search` operators. Example:
+
+```js
+Artist.find({ $text: { $search: "ram" } })
+// But which property are we text searchin on?
+```
+
+**Note:**
+- In Mongo, to be able to search on text for a property, that property must be *indexed*. If property `name` is indexed then the above query will run against `name`
+- Mongo can have only one indexed property for a collection (apart from the `_id` property which is indexed automatically)
+- To index a property as a text, we can start `mongo` on the CLI, `use <db>`, and call `<db>.<collection>.createIndex({ <property>: "text" })`
+- Text search can **only match full words** (Ex: 'Robert' but not 'rob' for "Robert mugabe" string)
+
+
