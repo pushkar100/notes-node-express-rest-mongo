@@ -2,6 +2,47 @@
 
 Node is built on Javascript an currently also supports some ES6 syntax. 
 
+## Contents
+
+- [NodeJS Essentials](#nodejs-essentials)
+  * [NodeJS History](#nodejs-history)
+  * [How NodeJS Applications Work?](#how-nodejs-applications-work-)
+  * [Node Core](#node-core)
+    + [Differences between browsers and NodeJS](#differences-between-browsers-and-nodejs)
+  * [Commonly Used Global Objects](#commonly-used-global-objects)
+    + [`__dirname` and `__filename`](#---dirname--and----filename-)
+    + [`process` object](#-process--object)
+      - [`process.stdout` and `process.stdin`](#-processstdout--and--processstdin-)
+    + [Global Timing Functions `setTimeout` and `setInterval`](#global-timing-functions--settimeout--and--setinterval-)
+  * [Modules](#modules)
+    + [Core Modules](#core-modules)
+      - [`readline` Module](#-readline--module)
+      - [`events` Module](#-events--module)
+      - [`child_process` Core Module](#-child-process--core-module)
+      - [`url` Core Module](#-url--core-module)
+    + [Custom Modules](#custom-modules)
+  * [The File System](#the-file-system)
+    + [`readdir`](#-readdir-)
+    + [`readFile`](#-readfile-)
+    + [`writeFile`](#-writefile-)
+    + [`appendFile`](#-appendfile-)
+    + [`mkdir`](#-mkdir-)
+    + [`exists`](#-exists-)
+    + [`rename`](#-rename-)
+    + [`unlink`](#-unlink-)
+      - [Renaming (Moving) & Deleting Directories](#renaming--moving----deleting-directories)
+    + [Streams of Data in NodeJS](#streams-of-data-in-nodejs)
+      - [`createReadStream`](#-createreadstream-)
+      - [`createWriteStream`](#-createwritestream-)
+  * [`http` Module](#-http--module)
+  * [NodeJS Package Manager (NPM)](#nodejs-package-manager--npm-)
+    + [Installing Packages Globally (Mac)](#installing-packages-globally--mac-)
+  * [Web Servers](#web-servers)
+    + [Introduction to Express](#introduction-to-express)
+  * [Web Sockets](#web-sockets)
+    + [`ws` Module](#-ws--module)
+    + [`socket.io` Module](#-socketio--module)
+
 ## NodeJS History
 
 - **2009** - NodeJS created.
