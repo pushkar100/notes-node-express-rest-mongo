@@ -1,5 +1,21 @@
 # RESTful Web API Design with NodeJS
 
+- [RESTful Web API Design with NodeJS](#restful-web-api-design-with-nodejs)
+  * [HTTP Request](#http-request)
+  * [HTTP Response](#http-response)
+  * [Identifying REST Resources](#identifying-rest-resources)
+  * [What is REST?](#what-is-rest-)
+  * [Installation](#installation)
+  * [High level overview of a REST API service using Express](#high-level-overview-of-a-rest-api-service-using-express)
+    + [Client](#client)
+    + [Server](#server)
+  * [1. Basic Express setup](#1-basic-express-setup)
+  * [2. Testing Express routes](#2-testing-express-routes)
+  * [3. Refactoring app to router & controllers](#3-refactoring-app-to-router---controllers)
+  * [4. Setting up models with Mongoose](#4-setting-up-models-with-mongoose)
+  * [5. Parsing request bodies](#5-parsing-request-bodies)
+  * [6. Testing database connections](#6-testing-database-connections)
+
 **API** (Application programming interface) is an *interface* that hides or abstracts complex functionality. For example, power button is an interface to the startup/shutdown functionality.
 
 APIs do at least three things:
@@ -168,4 +184,214 @@ Intermediate components can transform the content of the messages. A layer added
 - *Latency*: Multiple layers increases latency (wait time) in processing data.
 
 *Optional* feature of REST: **Code on Demand** (It is not a required constraint).
+
+## Installation
+
+* We need Node & NPM on the machine. 
+* We need MongoDB server on a machine or on service provider like MLab
+* We need Express framework (makes it easy to create servers)
+* A testing suite to test our routes & db operations (like Jest or Mocha)
+* Mongoose ORM package to work with the Mongo database
+
+**`npm i -S express mongoose mocha`**
+
+## High level overview of a REST API service using Express
+
+### Client 
+
+The client i.e a browser will make an HTTP request via the REST protocol to our server (Ex: `GET`/`POST`/`PUT`/`DELETE`) on a particular route (Ex: `/api/drivers/`, `/api/drivers/:id`, etc)
+
+### Server
+
+The server is running on Node using the Express framework. Express will handle routes & the processes that must run (Ex: updating the DB, responding with query results)
+
+Our Express app must possess 3 things:
+
+1. **Router**: Looks at the route (& method) & sends it off to the appropriate part of the application (route handler)
+2. **Controller**: Contains all the logic on how to respond to a particular request (the function to run on a route)
+3. **Model**: The data part of the application that the controller interfaces with (Ex: mongoose, mongoDB part)
+
+Via the Mongoose ORM, the server is connected to the running MongoDB server
+
+## 1. Basic Express setup
+
+```js
+// app.js
+const express = require('express')
+const app = express() // Invoking express function creates a new app
+
+// Router handler for GET requests to "localhost:3050/api"
+app.get('/api', (req, res) => {
+  res.send({
+    hi: 'there'
+  })
+})
+
+module.exports = app
+```
+
+```js
+// index.js
+const app = require('./app')
+
+app.listen(3050, () => {
+  console.log('Running on PORT 3050');
+})
+```
+
+Start the server with **`node index.js`**
+
+## 2. Testing Express routes
+
+With a test suite, we can test the express route handling & the response it sends back. There is a package called **`supertest`** which helps us make (fake) requests to our running express app
+
+```js
+// test/app_test.js
+const assert = require('assert')
+const request = require('supertest')
+const app = require('../app')
+
+describe('The Express app', () => {
+  it('Handles a GET request to /api', done => {
+    request(app)
+      .get('/api')
+      .end((err, response) => {
+        assert(response.body.hi === 'there')
+        done()
+      })
+  })
+})
+```
+
+## 3. Refactoring app to router & controllers
+
+Once the Express app starts, we can delegate request routing to a separate module (router). Define this as a function that takes in an app and uses it to define certain routes
+
+The router can then decide which controller function to call for processing that particular request. The controller method then gets access to the `req, res` properties, can perform logical operations and send back a result. 
+
+In brief, this is how we refactor our REST API app in Node & Express to become more modular & manageable
+
+```
+Example folder structure:
+- package.json
+- app.js
+- index.js
+- routes/
+	- routes.js
+- controllers/
+	- driver_controllers.js
+- test/
+
+// NOTE: THE FLOW:
+// App => routes => controllers => model
+```
+
+```js
+// app.js
+const express = require('express')
+const app = express()
+const routes = require('./routes/routes')
+
+routes(app)
+
+module.exports = app
+```
+
+```js
+// routes/routes.js
+const DriversController = require('../controllers/drivers_controller')
+
+module.exports = (app) => {
+  app.get('/api', DriversController.greeting)
+}
+```
+
+```js
+// controllers/drivers_controller.js
+module.exports = {
+  greeting(req, res) {
+    res.send({
+      hi: 'there'
+    })
+  }
+}
+```
+
+## 4. Setting up models with Mongoose
+
+We need a `models` folder. This will hold the mongoose models & schemas that eventually interact with the Mongo DB
+
+```
+- app.js
+- models/
+	- driver.js
+- routes/
+- controllers/
+```
+
+***Note that for each collections i.e a list, we can have a model***. It is kind of the convention
+
+```js
+// models/driver.js
+const mongoose = require('mongoose')
+const Schema = mongoose.Schema
+
+const DriverSchema = new Schema({
+  email: {
+    type: String,
+    require: true
+  },
+  driving: {
+    type: Boolean,
+    default: false
+})
+
+const Driver = mongoose.model('driver', DriverSchema)
+
+module.exports = Driver
+```
+
+## 5. Parsing request bodies
+
+By default, a node server receives a request in "chunks" i.e bit by bit like a stream. It is very hard to read this stream by ourselves and construct the final body. Instead, we use a *middleware* called **`body-parser`** to parse the request chunks and when all of it has finally arrived, puts it into **`body`** property of the request
+
+**`npm i -S body-parser`**
+
+Usage: `bodyParser.json()` assumes that the request body is in the `json` format and it will convert it into a JS object
+
+```js
+const express = require('express')
+const app = express()
+const bodyParser = require('body-parser')
+const routes = require('./routes/routes')
+
+app.use(bodyParser.json())
+
+routes(app)
+
+module.exports = app
+```
+
+## 6. Testing database connections
+
+For production, use a particular mongo database. For testing, use another, In this way, dropping collections & CRUD operations during testing don't affect production data. 
+
+We can use an environment variable for the same (Ex: `NODE_ENV=test` and accessing it inside node via `process.env.NODE_ENV`)
+
+```js
+// Inside app code:
+if (process.env.NODE_ENV !== 'test') {
+	mongoose.connect('mongo://localhost/prod_db')
+}
+
+// Inside test code:
+before(done => {
+  mongoose.connect('mongo://localhost/test_db')
+  mongoose.connection
+    .once('open', () => {
+      // Can go ahead and drop collections before starting tests
+    })
+    .on('error', () => {})
+}
+```
 
