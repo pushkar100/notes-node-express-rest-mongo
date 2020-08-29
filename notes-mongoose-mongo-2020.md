@@ -683,6 +683,8 @@ const UserSchema = new Schema({
 })
 ```
 
+**Note**: If you wish to provide a default value to a schema property, use **`default`** key (Ex: `isAlive: { type: Boolean, default: true }`)
+
 ### Checking if the value is valid
 
 Once you have added validation and want to test if the record creation was validated (created or reject) or not, you can user `<record>.validate()` or `<record>.validateSync(result => { ... })`
