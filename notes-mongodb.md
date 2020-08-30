@@ -11,7 +11,7 @@ Starting the DB server: Run `mongod` in the terminal. Once the DB starts, we can
 - `show dbs`: Lists all the databases that were created.
 - `use <db-name>` : Switches to/Creates the specified database.
 - `db`: Tells us the current database we are on.
-- `db.db.dropDatabase()`: Removes the current database, deleting the associated data files.
+- `db.dropDatabase()`: Removes the current database, deleting the associated data files.
 
 **JSON syntax**
 
