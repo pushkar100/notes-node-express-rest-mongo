@@ -2,6 +2,71 @@
 
 [Course link](https://www.udemy.com/course/rest-api)
 
+**Contents**
+
+- [Designing & Building REST APIs](#designing---building-rest-apis)
+  * [What the course covers](#what-the-course-covers)
+  * [Can we use mLab for hosted mongo services?](#can-we-use-mlab-for-hosted-mongo-services-)
+  * [Why is REST popular?](#why-is-rest-popular-)
+  * [Types of API consumers & APIs](#types-of-api-consumers---apis)
+  * [API management](#api-management)
+    + [Security](#security)
+    + [Documentation](#documentation)
+    + [Access request](#access-request)
+    + [SLA Management](#sla-management)
+  * [REST architectural constraints](#rest-architectural-constraints)
+    + [Client-Server](#client-server)
+    + [Uniform interface](#uniform-interface)
+    + [Statelessness](#statelessness)
+    + [Caching](#caching)
+      - [Caching on the server](#caching-on-the-server)
+      - [Caching outside the server](#caching-outside-the-server)
+      - [Cache directives as HTTP headers](#cache-directives-as-http-headers)
+      - [How is an Etag header helpful?](#how-is-an-etag-header-helpful-)
+      - [How does a server calculate the Etag?](#how-does-a-server-calculate-the-etag-)
+      - [The W in an Etag](#the-w-in-an-etag)
+      - [Last modified header & its use](#last-modified-header---its-use)
+    + [Layering](#layering)
+    + [Code on demand](#code-on-demand)
+    + [Measuring the RESTfulness of an API](#measuring-the-restfulness-of-an-api)
+  * [Designing a REST API](#designing-a-rest-api)
+    + [Domain examples](#domain-examples)
+    + [Product or package](#product-or-package)
+    + [Version](#version)
+    + [Resource & ID](#resource---id)
+    + [Root URL](#root-url)
+    + [Resource naming conventions](#resource-naming-conventions)
+    + [Resource associations](#resource-associations)
+    + [HTTP request flow for REST API](#http-request-flow-for-rest-api)
+    + [HTTP response flow for REST API](#http-response-flow-for-rest-api)
+    + [HTTP status codes](#http-status-codes)
+    + [Using the appropriate verbs](#using-the-appropriate-verbs)
+    + [Creating a new resource](#creating-a-new-resource)
+    + [Retrieving a resource](#retrieving-a-resource)
+    + [Updating a resource](#updating-a-resource)
+    + [Deleting a resource](#deleting-a-resource)
+    + [Notes](#notes)
+    + [Data format](#data-format)
+  * [API error handling patterns](#api-error-handling-patterns)
+    + [How many HTTP status codes to use](#how-many-http-status-codes-to-use)
+    + [Application error response handling patterns](#application-error-response-handling-patterns)
+  * [API versioning patterns - Handling changes](#api-versioning-patterns---handling-changes)
+    + [Types of changes](#types-of-changes)
+    + [When to change your API?](#when-to-change-your-api-)
+    + [How to version your APIs?](#how-to-version-your-apis-)
+  * [REST API cache control patterns](#rest-api-cache-control-patterns)
+    + [Who controls caching?](#who-controls-caching-)
+    + [Why cache?](#why-cache-)
+    + [What to cache and for how long?](#what-to-cache-and-for-how-long-)
+    + [Cache control directives](#cache-control-directives)
+      - [Directives](#directives)
+  * [REST API response handling patterns](#rest-api-response-handling-patterns)
+    + [Custom partial response support](#custom-partial-response-support)
+    + [Adding pagination support](#adding-pagination-support)
+  * [REST API security](#rest-api-security)
+  * [REST API specifications using Swagger 2.0](#rest-api-specifications-using-swagger-20)
+  * [REST API management](#rest-api-management)
+
 ## What the course covers
 
 1. Evolution of REST APIs
@@ -846,7 +911,7 @@ How to implement pagination?
 
 In *cursor* approach, you have an "envelope based response" i.e you have a response similar to what is below:
 
-```json
+```js
 {
   data: { /* endpoint data is here */
   paging: {
@@ -876,3 +941,8 @@ This is the most common approach
 
 In *HTTP link header* approach: We use the `Link` header that contains a URL to the next page in the API. Approach is not very commonly used
 
+## REST API security
+
+## REST API specifications using Swagger 2.0
+
+## REST API management
