@@ -154,6 +154,7 @@ This constraint suggests the following:
 
 1. ***Individual resources are identified in the Request (URI/URL)***
 	- For example, www.google.com/api/users/23 identifies a user based on the user id i.e 23
+	- All REST API resources are identified by a **Uniform Resource Identifier (URI)**. For example, prefer `/cars/:id` (iex: `/cars/23`) over `/cars?id=23`. The former is a URI and it identifies a resource (restful). But, in the latter method, the URI is same for all and the query parameter identifies the resource (not restful)
 2. ***Representation of the resources***
 	- Client receives representation of resource (Ex: client receives details of a car) which it uses to manipulate the resource itself
 	- Note that the format of the resource data need not be same on server & client. For example, the data can be inside a DB on server and sent to client via JSON or CSV
@@ -186,7 +187,7 @@ Therefore, *all requests to the server are self-contained* (no dependence on ser
 
 > "Use caching to achieve **higher scalability & performance**
 
-Caching nullifies or negates the challenges that statefulness creates. Therefore, it will help us reduce the chatter as well as the data size of the requests
+Caching *counterbalances* the challenges that statefulness constraint creates. Therefore, it will help us reduce the chatter as well as the data size of the requests
 
 #### Caching on the server
 
@@ -328,7 +329,7 @@ In this layered approach:
 - There is space for architecture to evolve (Ex: Introducing a load balancer & multiple servers)
 - At the most, the layer in question & one other layer are impacted due to changed
 
-*REST APIs tend to work very well with layered architectures* and hence it is recommended we use them during REST API design
+*REST APIs tend to work very well with layered architectures* and hence it is recommended we use them during REST API design. Layering allows for *simplicity* but does *not affect performance*
 
 ### Code on demand
 
@@ -356,5 +357,522 @@ If we support code on demand then it is known as **HATEOAS** (Hypermedia As The 
 
 We use the **Richardson Maturity Model (RMM)**. It is a way to measure RESTfulness of an API. This model was built by analysing 100s of web services
 
+[Link to RMM article by Martin Fowler](https://martinfowler.com/articles/richardsonMaturityModel.html)
+
 RMM provides an API service a score between `0` & `3`. If you have scored `0` then it means the API is not at all RESTful. If you have scored `1` then it means the API is fully REST compliant
+
+**LEVEL 0**
+
+- Least RESTful. 
+- Implements an `RPC with HTTP + XML (with SOAP maybe) + only 2 methods: GET & POST`
+
+**LEVEL 1 (Resources)**
+
+- Considers web as a collection of resources (instead of just URL endpoints). Ex: Vacation is a resource which is associated with other resources such as packages and reviews
+- Therefore, it is a combo of `Resources + URI endpoints`
+
+**LEVEL 2**
+
+Apart from consider web API as a collection of resources, it:
+
+- Uses all verbs such as GET, POST, DELETE, PUT ... . These verbs are used to manipulate the resources. Therefore, CRUD operations are implemented with the above 4 verbs. *You cannot carry out CRUD without using HTTP verbs*
+- Therefore, it is a combo of `resources + URI endpoints + All HTTP verbs`
+
+**LEVEL 3**
+
+- Most RESTful. *Highest level of maturity!*
+- Employs Hypermedia. It employs HATEOAS (Code on demand) which allows for further manipulation and the concept of discovery of resources on the server
+- Therefore, it is a combo of `resources + URI endpoints + All HTTP verbs + HATEOAS`
+
+Once an API has reached the third level, it is the most mature RESTful service it has ever been
+
+## Designing a REST API
+
+An API client needs an **Endpoint URL for the API**. The syntax:
+
+```js
+// The API URL endpoint:
+https://<domain>/<product>/<version>/<resource>/{id}
+
+// Base URL:
+https://<domain>
+
+// Grouping name (optional):
+<product>
+
+// Version of API:
+<version>
+
+// REST resource:
+<resource>
+
+// Resource ID:
+{id}
+```
+
+### Domain examples
+
+- `https://api.paypal.com` (It is common to use `api` subdomain)
+- `https://app.ticketmaster.com` (It is also common to use `app` subdomain)
+- `https://developer.uber.com`
+
+**Pro-tip:** Keep a ***subdomain*** for your APIs. Do not use the same as the website i.e do ***not*** use `www`
+
+### Product or package
+
+This is ***optional***. You can logically group the API based on the products or the teams that will be working on them. For example, `https://api.store.com/payments/` or `https://api.store.com/discovery/` can be managed by a payments and a discovery team, respectively
+
+Product , if used, helps multiple teams independently develop parts of the API
+
+Without a product, we have a version of the API immediately after the domain. Ex: `https://api.store.com/v1`
+
+### Version
+
+- A version is useful when you expect the API to *evolve over time*
+- Maintaining different versions insulates users (clients) from breaking changes in the API (Gradual adoption)
+
+Version example: `https://api.store.com/v1`
+
+**Alternative approaches:** Instead of a version in the endpoint, some API designers add the version in the ***headers*** or as ***query parameters*** (Ex: `?v=1`)
+
+### Resource & ID
+
+If you do not specify an `{id}` then the endpoint can work on a *collection of resources*. If you pass an ID, it will work on that particular resource
+
+It is common convention to use ***plurals*** for the resource name (Ex: `books` over `book`). If you do not specify an ID then you get to work with a collection of resources and plurals help to think in terms of many resources
+
+Example:
+
+```shell
+# Collection of resources:
+https://api.store.com/v1/books/
+
+# A particular resource (book by id 5661):
+https://api.store.com/v1/books/5661
+```
+
+###  Root URL
+
+The domain, product, & version form the root URL (up to the version). For example, `https://api.store.com/discovery/v1` is the root url and on this root url, you have resources, usually defined separately with a path like `/books` and so on
+
+### Resource naming conventions
+
+- Use ***"nouns"*** for naming resources (i.e Easy to remember it as name, place, animal, or a thing). Ex: `books` or `cities` or `users`
+- Use ***"plurals"*** for naming resources (Easier to think of them as collections). Ex: `photos` over `photo`
+
+The above two conventions help with actual resource. 
+
+*What if you need endpoints for actions (calculations or derived resources) instead of a resource?* 
+
+- Use a ***"verb"*** for your "action" endpoints
+- Examples of verbs are `calculate`, `search`, etc
+- It is common to combine actions (verbs) with query parameters for more refined actions
+- A full example: `https://api.store.com/v1/books/search?q=harry+potter`
+
+**Note**: 
+
+- Difference between an action & a resource is that an action does not refer to any specific API resource 
+- Actions can be a part of the "resource hierarchy". For example, if you need estimates (action) of a price (another action) the endpoint can be `/estimates/price`
+
+### Resource associations
+
+We can nest resources by specifying them in the endpoint in the order in which they make sense. For example, users have posts, posts have comments, and so on. Alternatively, people have followers.
+
+Examples: 
+- `/people/{id}/followers/{id}`
+- `/accounts/{id}/transactions/{id}`
+
+**Note**: Avoid deep nesting (too many associations) in the APIs. Pro-tip: Keep it at a ***max of 3***
+
+### HTTP request flow for REST API 
+
+As part of the *uniform interface*, client requires the following:
+
+1. API endpoint URL (Which it uses to make GET/POST/PUT/DELETE (CRUD) requests to)
+2. Query parameters that are available (if any)
+
+In return, client specifies the following in the request:
+
+1. Standard headers. Ex: An `Accepts` header (to indicate the type of data format it expects in response)
+2. Custom headers (if required by contract. Ex: `x-auth-token`)
+3. Body of the request (It is usually in a form that is defined by its `Content-Type` header)
+
+The client will likely follow a *request schema*
+
+### HTTP response flow for REST API
+
+The server specifies the following in the response:
+
+1. HTTP status code (Ex: `200`, `404`, etc) - Has to be always present!
+2. Standard headers
+3. Custom headers (if required by contract)
+
+The client will likely follow a *response schema*
+
+### HTTP status codes
+
+1. **`1xx`: Informational** (Not used in regular API development)
+2. **`2xx`: Success**
+   - `201`: Created
+   - `204`: No content
+3. **`3xx`: Redirection**
+   - `301`: Moved permanently
+   - `304`: Not modified
+   - `307`: Temporary redirect
+4. **`4xx`: Client error**
+   - `400`: Missing required field 
+   - `401`: Unauthorized
+   - `402`: Payment required
+   - `403`: Forbidden
+   - `404`: Resource not found
+   - `415`: Unsupported media type (Ex: When client requests response data in XML but server supports only JSON)
+   - `429`: Too many requests (Ex: User is allowed to use app from only 2 clients but 3 clients are trying to access at the same time)
+5. **`5xx`: Server error**
+   - `500`: Internal server error
+   - `502`: Bad gateway
+   - `503`: Service unavailable
+   - `504`: Gateway timeout
+
+### Using the appropriate verbs
+
+Map the following 4 popular verbs to the intended CRUD operations:
+
+1. GET for Read (Retrieve)
+2. POST for Create
+3. PUT for Update (Can also use PATCH in some cases)
+4. DELETE for DELETE
+
+### Creating a new resource
+
+- Use `POST` and the request body contains the resource representation
+- If successful, return a `2xx` (Ex: `201` created)
+- If client error return `4xx` (Ex: `400` missing required field)
+- If server error return `5xx` (Ex: `503` database unreachable)
+- Response data:
+	- May return the new resource instance (Ex: in JSON or XML format)
+	- May return new link associated with the new resource instance (HATEOAS approach)
+
+### Retrieving a resource
+
+- Use `GET` and the request body is optional (mostly never populated)
+- If successful, return a `2xx` (Example: `200 OK`)
+- If client error return `4xx` (Ex: `404` resource not found)
+- If server error return `5xx` (Ex: `500` internal server error)
+- Response data:
+	- A collection of data if no ID was specified
+	- A single instance of request resource (if ID was specified)
+
+### Updating a resource
+
+- Use `PUT` for updating all the fields of a resource instance i.e replace resource with new data
+- Use `PATCH` for updating only some fields of a resource instance i.e update only some attributes
+- PATCH maybe more performant on resources that are *large data objects*
+- Usually a PATCH attribute is defined as a *query parameter*
+- Ex: `PATCH https://api.store.com/books/121?title=The+Mossad`
+- Request body contains the data to update the resource
+- If successful, return a `2xx` (Ex: `201` created or `204` no content - if there is no data sent back in response body)
+- If client error return `4xx`
+- If server error return `5xx`
+
+### Deleting a resource
+
+- Use `DELETE` and generally body in request is left empty (For example, {id} takes care of identifying resource)
+- If successful, return a `2xx` (Example: `204` no content - if there is no data sent back in response body)
+- If client error return `4xx`
+- If server error return `5xx`
+
+### Notes
+
+- Custom and standard headers can be part of each request & response (For any CRUD operation)
+- We can use only POST instead of PUT & PATCH (flexible). twitter uses only GET & POST but the way their endpoints are listed differ. Ex: `POST` on `/saved_searches/destroy/{id}` to delete a tweet
+
+### Data format
+
+A REST API format need not only be `json` (misconception). It can be defined as per the contract in the uniform interface. It can be XML or CSV or any other type agreed upon by the contract
+
+If an API supports *multiple data formats*, it can be considered a ***feature*** of that API
+
+- Client requests a format in the form of `Accepts` header. Ex: `Accepts: application/json`
+- If successful, data is available in the response in requested type, indicated by a `200` success status code and the `Content-Type` header lists the data format which is expected to match the value of `Accepts` header that came in the request
+- If data format is not supported by server, it sends back a **`415`** unsupported media type status (no body)
+
+**Alternatively**: A suffix with extension (`/weather/{day}date.json`) or a query parameter (`/weather?day=xx/xx/xxxx`) may also be used in the request to indicate expected response data format
+
+**Pro-tip**: As a REST API designer, ensure documentation of supported formats in the documentation portal
+
+## API error handling patterns
+
+The error information is contained in:
+
+1. Response header: Start line with `status-code` & `Reason-phrase` (Ex: `404 not found`)
+2. Response body: It contains an application status code as per the format for the body
+
+This error information can be used by the client to log it and show the end user a friendly error message
+
+Error options:
+
+1. **Error information only in header**: Only have status code but nothing in body (or no body)
+2. **Error information only in the body**: *This is the least preferred approach*. Every call will have a success status even if it is a failure - failure is only detected in the body (Facebook used it in the early day but not anymore) 
+3. **Error information in both header & body**: The ***recommended*** approach. Status code will indicate type of error and the code for error inside the body will give more details regarding it. In this approach, there is:
+	- **HTTP error status**
+	- **Application error response (inside body)**
+
+### How many HTTP status codes to use
+
+As an API developer, decide on which HTTP status codes are of the most use to you and only use that subset. Recommendation: Do not use more than **10** of them
+
+**Why limit it?**
+
+- Hard for API management team to manage them
+- Hard for clients to adapt every one of them
+
+### Application error response handling patterns
+
+How to design an Application error response?
+
+1. Informative and actionable. Ex: If a field is missing then it should tell which field and how the app developer can fix it
+2. Simple. Ex: It must not be hard to understand the error
+3. Consistent. Ex: All responses must use one of the decided error codes & keep the format consistent
+
+**Application status (error) code**
+
+- It is recommended that this be a *number*. Ex: `1002` or a prefixed, namespaced number like `US_2899`
+- It must be *well-documented*. The API developers should not create multiple error codes for the same error
+
+**Application response template**
+
+The idea is to maintain a standard format that accounts for both success & error cases. The two approaches are:
+
+1. No wrapper
+2. Response wrapper
+
+In "no wrapper" case, the format is similar to what is below:
+
+```shell
+text: message # An overview of the error
+timestamp: datetime # Maintaining time for logging purposes
+method: HTTP verb # Status code indicating success/failure
+endpoint: URL # Again, logging the API endpoint for debugging
+errors: List # A list of "ERROR OBJECTS" (Multiple errors possible)
+payload: Optional # If no error, it contains response data
+# If error, we usually leave it blank
+```
+
+Each error object can contain the following:
+
+```shell
+code: number # A unique code for identifying the error
+text: message # A message about the error 
+hints: actions # A list of possible resolutions to the error
+info: documentationURL # To refer to documentation portal
+```
+
+In the "Response wrapper" style, the format remains the same but the "payload" is separated out from the "status". In this approach, your API may also send 200 (success) always:
+
+```js
+{
+  status: { text, errors, method, ... },
+  payload: { ... }
+}
+```
+
+**Note:**
+
+- Primary consumer of your API is the client app developer
+- As best practice, include hints & info (document links) in error response
+- Use a standard format for your responses to avoid confusion
+
+## API versioning patterns - Handling changes
+
+An API (& even software) *changes over time*. That is the only constant and it cannot be prevented!
+
+We cannot force internal & external developers to change to a new API all of a sudden. We don't have control over it and we do not want to cause distress to client app developers
+
+### Types of changes
+
+1. **Non-breaking**: No client app code change required. For example, sending additional property called `pictures`
+	- New resource or operation (Ex: new `/deals` resource endpoint)
+	- Adding optional parameters or properties (Ex: `/existing?limit=3` adding a limit option)
+2. **Breaking**: Client app will break if this happens
+	- Change HTTP verbs or methods (Ex: POST to PUT)
+	- Delete an existing API operation (Ex: remove /search?q=xyz)
+
+### When to change your API?
+
+First, we must ask ourselves, "Can we avoid the changes?". If the change does not add value, don't make it
+
+However, in many cases it is not possible to not have changes. We can follow some ***best practices*** in such cases:
+
+1. Provide planning opportunity to client (external) devs i.e Sufficient time to port to new API
+2. Support backward compatibility (Keep it a non-breaking change if possible)
+3. Provide document support to devs i.e Keep snippets and examples on developer portal
+4. Limit frequency of changes
+5. ***Always version your API since day 1***
+
+Try to make non-breaking changes if possible. These are *minor changes* (Ex: Limiting attribute length to a value more than before which does not affect client's current attribute length - no client change required). For *major changes*, it is usually a breaking change and we must follow the best practices
+
+### How to version your APIs?
+
+Keep multiple versions available. When you release a new API:
+
+1. Old API must still be available and marked as deprecated
+2. New API becomes available and fully supported
+3. Overt time we can retire the old API i.e unsupported (Provide a roadmap & sufficient time to developers to adapt to new API) 
+
+**Versioning techniques**:
+
+1. In the API *(Most popular)*. Ex: `https://domain/product/version/resource/{id}`
+2. In the header. Ex: `x-api-version: <version>`
+3. In the query string. Ex: `/resource/id?version=<version>`
+
+**Version formats**:
+
+1. Prefixed with a `v` *(Most popular)*. Ex: `v2`
+2. Has a `major.minor` format. Ex: `2.4`
+3. Has a date i.e date of API version launch. Ex: `2012-09-11`
+
+Example: `https://api.store.com/v2/books/9234`
+
+## REST API cache control patterns
+
+What are the points at which caching can occur? There are many!
+
+- Client caching (Ex: browser)
+- ISP caching
+- Gateway caching (On server network gateway)
+- Mid-tier caching (On the server)
+- Database caching
+
+### Who controls caching?
+
+The ***API*** controls it (Ex: Via the cache control headers). It is part of the API design decision making
+
+### Why cache?
+
+- It improves performance 
+- Reduces chattiness (Too much back & forth between server & client)
+- It is good for scalability or throughput
+	- Imagine you are getting 30 calls/second and DB supports 50 ops/sec
+	- Suddenly, you're product is popular and more people have started using it
+	- You start hearing complaints that certain calls are failing
+	- On investigating, you find that calls are now 60/sec and DB is failing for the extra ones
+	- Here, we can cache certain requests on the mid tier itself, instead of upgrading DB capabilities and so on
+
+### What to cache and for how long?
+
+The factors to consider are:
+
+1. Speed of change (Frequency of change)
+2. Time sensitivity
+3. Security
+
+***Static*** contents like JS/CSS/HTML/images don't change very frequently. Hence, their speed of change is less. Therefore, they can be cached for days or weeks or more
+
+API, however, is most likely to contain very ***dynamic*** data. Some APIs like stock market trading and news might be very time sensitive. Other APIs that contain user data require security and should not be cached on the gateway or ISPs
+
+### Cache control directives
+
+The API can define **`cache-control`** header which places directives for caching mechanism on client and intermediaries. This header can also be sent in the request (by API consumer - client) to control caching of the request data
+
+Syntax: `Cache-Control: <directive1>=<value>, <directive2>,...`
+
+#### Directives
+
+1. `public` vs `private` (Ex: `Cache-Control: private, max-age=60`)
+	- Public means the data can be cached on intermediaries as well as the client
+	- Private means the data can only be cached on the client (Not on intermediaries like ISPs or Gateways). Assume you have user information that is financial in nature - you do not want this on your ISPs but only on the client
+2. `no-store` (Ex: `Cache-Control: no-store, max-age=60`)
+	- Clients generally store cache on the filesystem. This is not very secure as it can be accessed by some other entity
+	- This rule states that the data cannot be "stored" anywhere (Hence, browser cannot save cache locally on the system). In-memory caching should likely be fine (?)
+	- It is used for sensitive data like bank transactions, medical records, etc
+3. `no-cache` (Along with the `Etag` header) (Ex: `Cache-Control: no-cache, max-age=60`)
+	- Always get data from the server
+	- Subsequent request to the same URL will return different data
+	- *Drawback*: Inefficient as we don't use caching 
+	- *Solution*: Used to check if the data has changed on the server (returns `304 Not modified` otherwise, with no body, leading to a faster RTT at least). If data has indeed changed, send a `200 OK` response with the data
+	- Useful for time sensitive data (extremely dynamic)
+	- If you have *large responses*, consider using the `Etag` header
+4. `max-age` (Ex: `Cache-Control: private, max-age=60`)
+	- Instructs how long to cache the resource for in **seconds**
+	- Be very careful in setting this value as it can lead to unpredictable behaviour and complaints if not set properly
+
+*An example of `no-cache` & `Etag`:* You are developing a stock market trading API. Caching is not an option here. However, server can still respond immediately without data & the processing time involved in it by checking the `Etag` hash
+
+*An example of `no-store` & `no-cache`:* Saving social security numbers SSN or passwords must not be stored nor cached. It can lead to leaks and malicious use
+
+## REST API response handling patterns
+
+> "Client must control response data"
+
+What this means is that different clients have different requirements with respect to response size & attributes. The client must be able to control what it needs and how much of it. In general, it allows for *better performance*, *granularity control*, & *optimised resource usage*
+
+**Partial response** is an example of response handling. A client may request only a subset of the data that comes normally in a response. This can be done through specifying the fields. It is useful for minimising network bandwidth and other performance benefits
+
+***Pagination*** of data is an example. A mobile client might request smaller dataset of a resource at first than a desktop client. It may load the remaining or more on demand, when it chooses to. This is a performance and UX consideration and is very important
+
+Advantages:
+
+- Better performance
+- Better CPU utilisation
+- Battery saver
+
+We can still have the ***same*** API endpoints
+
+How do we do it then?
+
+1. Custom partial response support
+2. Use *GraphQL* (A different way of doing APIs and built for just this kind of a thing, by facebook)
+
+### Custom partial response support
+
+We can add query parameters:
+
+1. *Single query parameters*: These list the fields you want to access
+	- Ex: `/resource/{id}?fields=foo,bar,baz:(beep)`
+	- The above might return only `foo`, `bar`, & `baz.beep` in the response data
+2. *Multiple query parameters*: These either include or exclude fields. Ex: using terms like `only` or `omit`
+	- Ex: `/resource/{id}?omit=bar,baz`
+	- The above might return every field except `bar` and `baz` in the response data
+
+### Adding pagination support
+
+Pagination deals with collections of resources. It splits them up into "pages" which the client can ask instead of getting the whole data at once. This is good for performance (allows for on-demand loading & optimised resource usage)
+
+How to implement pagination?
+
+1. Cursor based
+2. Offset based *(most popular)*
+3. Use of HTTP link header
+
+In *cursor* approach, you have an "envelope based response" i.e you have a response similar to what is below:
+
+```json
+{
+  data: { /* endpoint data is here */
+  paging: {
+    cursors: {
+      after: /* Some hash */
+      before: /* Some other hash */
+    }
+  }
+  next: ... /* link to api endpoint to get next page (HATEOAS) */
+  prev: ... /* link to api endpoint to get prev page (HATEOAS) */
+}
+```
+
+This cursor approach has many benefits as [listed here](https://jsonapi.org/profiles/ethanresnick/cursor-pagination/)
+
+In *offset based* approach:
+
+- Makes use of query parameters
+- We need to supply an **offset** & a **limit** at the very least
+- Offset specifies which page to fetch i.e which record to start from
+- Limit specifies how many records to retrieve (from the offset point)
+- If you need bidirectional search, a *direction* query string parameter might also be supplied
+
+Ex: `/books?offset=0&limit=10` and then `/books?offset=1&limit=10` for the next page
+
+This is the most common approach
+
+In *HTTP link header* approach: We use the `Link` header that contains a URL to the next page in the API. Approach is not very commonly used
 
